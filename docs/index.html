@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서울 재건축 아파트 · 재건축 전 실거래가 비교</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1d2129; --sub:#6b7280; --line:#e5e7eb; --key:#2563eb; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); line-height:1.5;
+         font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:10px 14px; position:sticky; top:0; z-index:20; }
+  h1 { font-size:16px; margin:0; }
+  .desc { font-size:12px; color:var(--sub); }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px; }
+  select { font-size:14px; padding:5px 8px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:3px 11px; font-size:13px; cursor:pointer; }
+  .chip.on { background:var(--key); border-color:var(--key); color:#fff; }
+  .time { display:flex; align-items:center; gap:6px; margin-top:6px; }
+  .time input { flex:1; }
+  .time b { font-size:15px; min-width:150px; text-align:center; }
+  .nav { border:1px solid var(--line); background:#fff; border-radius:8px; width:34px; height:30px; font-size:15px; cursor:pointer; }
+  main { max-width:1100px; margin:0 auto; padding:8px; }
+  #map { height:52vh; min-height:300px; border-radius:12px; border:1px solid var(--line); background:#e5e7eb; }
+  #mapmsg { font-size:12px; color:var(--sub); padding:4px 2px; }
+  .box { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:8px; }
+  .box h2 { font-size:15px; margin:0 0 6px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { border-bottom:1px solid var(--line); padding:6px 4px; text-align:left; vertical-align:top; }
+  th { background:#f9fafb; }
+  tr.on td { background:#eff6ff; }
+  td.name { cursor:pointer; }
+  .tr { white-space:nowrap; }
+  .num { text-align:right; white-space:nowrap; }
+  .bar { height:6px; background:#93c5fd; border-radius:3px; margin-top:3px; }
+  .note { font-size:12px; color:var(--sub); margin-top:6px; }
+  .label { background:#fff; border:1.5px solid #1f2937; border-radius:7px; padding:2px 6px; font-size:12px; line-height:1.3;
+           white-space:nowrap; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); text-align:center; }
+  .label .p { font-weight:700; color:#b91c1c; }
+  .label.off { border-color:#d1d5db; color:#9ca3af; box-shadow:none; font-size:11px; }
+  .label.sel { outline:3px solid var(--key); }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+  .scroll { overflow-x:auto; }
+  #chartbox { height:280px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>서울 재건축 아파트 · 재건축 전 실거래가 비교</h1>
+  <div class="row">
+    <select id="gu"></select>
+    <span id="sizes"></span>
+  </div>
+  <div class="time">
+    <button class="nav" id="prev">◀</button>
+    <input type="range" id="slider">
+    <button class="nav" id="next">▶</button>
+  </div>
+  <div class="row" style="justify-content:center;margin-top:2px"><b id="when"></b></div>
+</header>
+<main>
+  <div id="map"></div>
+  <div id="mapmsg"></div>
+
+  <div class="box">
+    <h2 id="title">이 시점의 재건축 전 시세</h2>
+    <div class="desc">지도에 보이는 단지 가운데, 고른 2개월 동안 재건축 전(옛 단지)으로 거래된 단지를 가격순으로 보여 줍니다. 지도를 옮기면 같은 시점으로 다른 구를 볼 수 있습니다.</div>
+    <div class="scroll"><table id="table"></table></div>
+    <div class="note" id="none"></div>
+  </div>
+
+  <div class="box" id="cmp" hidden>
+    <h2>고른 단지의 재건축 전 시세 흐름</h2>
+    <div id="chartbox"><canvas id="chart"></canvas></div>
+    <div class="note">표의 단지 이름이나 지도 이름표를 누르면 그래프에 넣고 뺄 수 있습니다. 그래프의 점을 누르면 그 시점으로 이동합니다. 세로: 억 원.</div>
+  </div>
+
+  <div class="note" style="padding:6px 4px 20px">
+    평형은 실거래가 자료의 <b>전용면적</b>을 그대로 적고, 괄호 안 공급평형은 전용면적 × 1.3 ÷ 3.3058로 어림한 값입니다(실제와 1~2평 다를 수 있음).
+    이름은 지금(재건축 후) 이름이고, 회색 글씨가 재건축 전 이름입니다.
+    자료: 국토교통부 아파트 매매 실거래가(2006년~), 해제된 거래 제외.
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const KAKAO_JS_KEY = '997b87d7a5a35bc160624fba963badb2';
+const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#4b5563'];
+const SIZES = [['전체', 0], ['10평대', 10], ['20평대', 20], ['30평대', 30], ['40평대', 40], ['50평 이상', 50]];
+
+let index = [], loaded = {}, size = 30, month = null, MONTHS = [], selected = [], focusGu = null;
+let map = null, overlays = {}, coords = {}, chart = null, geocoder = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pyeong = a => Math.round(a * 1.3 / 3.3058);
+const band = a => { const p = pyeong(a); return p >= 50 ? 50 : Math.floor(p / 10) * 10; };
+const eok = m => (m / 10000).toFixed(m >= 100000 ? 1 : 2).replace(/\.?0+$/, '') + '억';
+const area = a => `전용 ${a.toFixed(2)}㎡ (약 ${pyeong(a)}평형)`;
+const addMonth = (m, k) => { let [y, mo] = m.split('-').map(Number); mo += k; while (mo > 12) { mo -= 12; y++; } while (mo < 1) { mo += 12; y--; } return `${y}-${String(mo).padStart(2, '0')}`; };
+const okSize = t => !size || band(t[1]) === size;
+const allItems = () => Object.values(loaded).flatMap(d => d.items);
+const winTrades = it => { const a = addMonth(month, -1); return it.trades.filter(t => okSize(t) && (t[0].startsWith(a) || t[0].startsWith(month))); };
+const colorOf = id => COLORS[selected.indexOf(id) % COLORS.length];
+
+async function init() {
+  index = await fetch('data/index.json').then(r => r.json());
+  const sel = document.getElementById('gu');
+  sel.innerHTML = index.filter(g => g.count).map(g => `<option value="${g.code}">${esc(g.gu)} (${g.count}곳)</option>`).join('');
+  sel.onchange = () => goGu(sel.value, true);
+  document.getElementById('sizes').innerHTML = SIZES.map(([n, v]) => `<button class="chip${v === size ? ' on' : ''}" data-v="${v}">${n}</button>`).join('');
+  document.querySelectorAll('#sizes .chip').forEach(b => b.onclick = () => {
+    size = +b.dataset.v; document.querySelectorAll('#sizes .chip').forEach(x => x.classList.toggle('on', x === b)); refresh();
+  });
+  const first = index.map(g => g.first).filter(Boolean).sort()[0] || '2006-01';
+  const last = index.map(g => g.last).filter(Boolean).sort().at(-1) || first;
+  for (let m = addMonth(first, 1); m <= last; m = addMonth(m, 1)) MONTHS.push(m);
+  const sl = document.getElementById('slider');
+  sl.min = 0; sl.max = MONTHS.length - 1;
+  sl.oninput = () => setMonth(MONTHS[+sl.value]);
+  document.getElementById('prev').onclick = () => setMonth(MONTHS[Math.max(0, MONTHS.indexOf(month) - 1)]);
+  document.getElementById('next').onclick = () => setMonth(MONTHS[Math.min(MONTHS.length - 1, MONTHS.indexOf(month) + 1)]);
+  initMap();
+  const start = index.find(g => g.code === '11650' && g.count) || index.find(g => g.count);
+  if (start) { sel.value = start.code; await goGu(start.code, true); }
+}
+
+async function loadGu(code) {
+  if (!loaded[code]) {
+    const d = await fetch(`data/${code}.json`).then(r => r.json());
+    d.items.forEach(it => { it.gu = d.gu; it.code = code; });
+    loaded[code] = d;
+  }
+  return loaded[code];
+}
+
+async function goGu(code, move) {
+  focusGu = code;
+  document.getElementById('gu').value = code;
+  const d = await loadGu(code);
+  if (!month) setMonth(bestMonth(d.items), true);
+  await placeMarkers(d.items);
+  if (move && map) {
+    const b = new kakao.maps.LatLngBounds(); let n = 0;
+    d.items.forEach(it => { const p = coords[it.id]; if (p) { b.extend(new kakao.maps.LatLng(p[0], p[1])); n++; } });
+    if (n) map.setBounds(b);
+  }
+  refresh();
+}
+
+// 처음 시점: 그 구에서 고른 평형대로 거래된 단지가 가장 많은 2개월
+function bestMonth(items) {
+  let best = MONTHS.at(-1), bestN = -1;
+  for (const m of MONTHS) {
+    const a = addMonth(m, -1);
+    const n = items.filter(it => it.trades.some(t => okSize(t) && (t[0].startsWith(a) || t[0].startsWith(m)))).length;
+    if (n > bestN) { bestN = n; best = m; }
+  }
+  return best;
+}
+
+function setMonth(m, quiet) {
+  month = m;
+  document.getElementById('slider').value = MONTHS.indexOf(m);
+  document.getElementById('when').textContent = `${addMonth(m, -1)} ~ ${m} 거래`;
+  if (!quiet) refresh();
+}
+
+function visible(it) {
+  if (!map) return it.code === focusGu;
+  const p = coords[it.id];
+  if (!p) return it.code === focusGu;
+  return map.getBounds().contain(new kakao.maps.LatLng(p[0], p[1]));
+}
+
+function refresh() { drawLabels(); renderTable(); renderChart(); }
+
+function renderTable() {
+  const rows = allItems().filter(visible).map(it => ({ it, ts: winTrades(it) })).filter(r => r.ts.length);
+  rows.forEach(r => r.avg = r.ts.reduce((s, t) => s + t[2], 0) / r.ts.length);
+  rows.sort((a, b) => b.avg - a.avg);
+  const max = Math.max(...rows.map(r => r.avg), 1);
+  const gus = [...new Set(rows.map(r => r.it.gu))];
+  document.getElementById('title').textContent = `${addMonth(month, -1)} ~ ${month} · ${SIZES.find(s => s[1] === size)[0]} · 재건축 전 시세 ${rows.length}곳`;
+  document.getElementById('table').innerHTML = rows.length ? `<tr><th>단지 (지금 이름)</th><th>거래 (날짜 · 면적 · 층 · 가격)</th><th class="num">평균</th></tr>` +
+    rows.map(r => `<tr class="${selected.includes(r.it.id) ? 'on' : ''}">
+      <td class="name" data-id="${esc(r.it.id)}">${selected.includes(r.it.id) ? `<span class="dot" style="background:${colorOf(r.it.id)}"></span>` : ''}<b>${esc(r.it.name)}</b>
+        <div class="desc">${gus.length > 1 ? esc(r.it.gu) + ' ' : ''}${esc(r.it.dong)} · ${r.it.buildYear}년 준공</div>
+        <div class="desc">재건축 전: ${esc(r.it.old.map(o => o.name).join(', '))}${r.it.check ? ' <span style="color:#b45309">· 연결 확인 필요</span>' : ''}</div></td>
+      <td>${r.ts.map(t => `<div class="tr">${t[0].slice(2)} · ${area(t[1])} · ${t[3] ?? '-'}층 · <b>${eok(t[2])}</b></div>`).join('')}</td>
+      <td class="num"><b>${eok(r.avg)}</b><div class="desc">${r.ts.length}건</div><div class="bar" style="width:${Math.round(r.avg / max * 100)}%"></div></td></tr>`).join('') : '';
+  document.getElementById('none').textContent = rows.length ? '' : '지도에 보이는 곳에서 이 시점·평형대에 재건축 전 거래가 없습니다. 시점이나 평형대를 바꾸거나 지도를 옮겨 보세요.';
+  document.querySelectorAll('td.name').forEach(td => td.onclick = () => toggle(td.dataset.id));
+}
+
+function toggle(id) {
+  selected = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+  refresh();
+}
+
+function renderChart() {
+  const items = selected.map(id => allItems().find(it => it.id === id)).filter(Boolean);
+  document.getElementById('cmp').hidden = !items.length;
+  if (chart) { chart.destroy(); chart = null; }
+  if (!items.length) return;
+  const toX = d => { const [y, m, dd] = d.split('-').map(Number); return y + (m - 1) / 12 + dd / 365; };
+  const [y, m] = month.split('-').map(Number);
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'scatter',
+    data: { datasets: items.map(it => ({ label: it.name, backgroundColor: colorOf(it.id), pointRadius: 3,
+      data: it.trades.filter(okSize).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) })) },
+    options: { maintainAspectRatio: false, animation: false,
+      scales: { x: { ticks: { callback: v => Math.floor(v) + '년', stepSize: 1 } }, y: { title: { display: true, text: '억 원' } } },
+      onClick: (e, els) => { if (els.length) { const t = chart.data.datasets[els[0].datasetIndex].data[els[0].index].t; setMonth(t[0].slice(0, 7)); } },
+      plugins: {
+        tooltip: { callbacks: { label: c => `${c.raw.it.name} ${c.raw.t[0]} ${area(c.raw.t[1])} ${c.raw.t[3] ?? '-'}층 ${eok(c.raw.t[2])}` } },
+      } },
+    plugins: [{ id: 'now', afterDraw: c => {   // 지금 고른 시점 표시
+      const a = c.chartArea, g = c.ctx;
+      const x1 = Math.max(a.left, c.scales.x.getPixelForValue(y + (m - 2) / 12));   // 앞달 1일
+      const x2 = Math.min(a.right, c.scales.x.getPixelForValue(y + m / 12));        // 그달 말일
+      if (x2 <= x1) return;
+      g.save(); g.fillStyle = 'rgba(37,99,235,.15)'; g.fillRect(x1, a.top, Math.max(2, x2 - x1), a.bottom - a.top); g.restore();
+    } }],
+  });
+}
+
+// ── 카카오 지도 ─────────────────────────────────────
+function initMap() {
+  const s = document.createElement('script');
+  s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&libraries=services&autoload=false`;
+  s.onload = () => kakao.maps.load(() => {
+    map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(37.5, 127.0), level: 6 });
+    geocoder = new kakao.maps.services.Geocoder();
+    let timer = null;
+    kakao.maps.event.addListener(map, 'idle', () => { clearTimeout(timer); timer = setTimeout(onMove, 250); });
+    if (focusGu) goGu(focusGu, true);
+  });
+  s.onerror = () => document.getElementById('mapmsg').textContent = '지도를 불러오지 못했습니다(카카오 지도 키에 이 주소가 등록되어 있어야 합니다). 위쪽 구 선택으로 비교할 수 있습니다.';
+  document.head.appendChild(s);
+}
+
+// 지도를 옮기면 화면 가운데의 구를 찾아 그 구 자료를 불러온다 (시점·평형대는 그대로)
+function onMove() {
+  const c = map.getCenter();
+  geocoder.coord2RegionCode(c.getLng(), c.getLat(), async (r, st) => {
+    if (st === kakao.maps.services.Status.OK) {
+      const gu = (r.find(x => x.region_type === 'B') || r[0]).region_2depth_name;
+      const g = index.find(x => x.gu === gu && x.count);
+      if (g && g.code !== focusGu) { focusGu = g.code; document.getElementById('gu').value = g.code; await placeMarkers((await loadGu(g.code)).items); }
+    }
+    refresh();
+  });
+}
+
+function geocode(addr) {
+  const cache = JSON.parse(localStorage.getItem('geo') || '{}');
+  if (addr in cache) return Promise.resolve(cache[addr]);
+  return new Promise(res => geocoder.addressSearch(addr, (r, st) => {
+    const p = st === kakao.maps.services.Status.OK ? [+r[0].y, +r[0].x] : null;
+    if (st !== kakao.maps.services.Status.ERROR) { cache[addr] = p; localStorage.setItem('geo', JSON.stringify(cache)); }
+    res(p);
+  }));
+}
+
+async function placeMarkers(items) {
+  if (!map) return;
+  let miss = 0;
+  for (const it of items) {
+    if (overlays[it.id]) continue;
+    const p = coords[it.id] || (coords[it.id] = await geocode(it.address));
+    if (!p) { miss++; continue; }
+    const el = document.createElement('div');
+    el.className = 'label';
+    el.onclick = () => toggle(it.id);
+    const o = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p[0], p[1]), content: el, yAnchor: 1.15, clickable: true });
+    o.setMap(map); o.el = el; o.it = it; overlays[it.id] = o;
+  }
+  document.getElementById('mapmsg').textContent = miss ? `위치를 찾지 못한 단지 ${miss}곳은 지도에 없고 표에만 나옵니다.` : '';
+}
+
+function drawLabels() {
+  for (const o of Object.values(overlays)) {
+    const ts = winTrades(o.it), sel = selected.includes(o.it.id);
+    const avg = ts.length ? ts.reduce((s, t) => s + t[2], 0) / ts.length : 0;
+    o.el.className = 'label' + (ts.length ? '' : ' off') + (sel ? ' sel' : '');
+    o.el.innerHTML = `${esc(o.it.name)}${ts.length ? `<br><span class="p">${eok(avg)}</span> <span class="desc">${ts.length > 1 ? ts.length + '건 평균' : '약 ' + pyeong(ts[0][1]) + '평형'}</span>` : ''}`;
+    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ');
+    o.setZIndex(sel ? 30 : ts.length ? 20 : 1);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
