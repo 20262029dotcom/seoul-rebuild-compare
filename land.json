@@ -1,0 +1,31 @@
+{
+ "설명": "재건축 전 세대당 대지지분. kind=area: 정비구역 면적 ÷ 기존 세대수(도로·공원 등이 포함되어 실제 대지지분보다 크게 나오는 어림값). kind=article: 기사에 나온 평형별 대지지분. 사람이 원문을 확인해 옮겨 적은 값.",
+ "items": [
+  {"gu": "11740", "name": "고덕그라시움", "old": "고덕주공2단지", "kind": "area", "zone_m2": 246210.10, "households": 2771,
+   "source": "강동구청 정비사업 현황(고덕주공2단지아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_001"},
+  {"gu": "11740", "name": "고덕아르테온", "old": "고덕주공3단지", "kind": "area", "zone_m2": 211408.6, "households": 2580,
+   "source": "강동구청 정비사업 현황(고덕주공3단지아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_002"},
+  {"gu": "11740", "name": "고덕센트럴IPARK", "old": "고덕주공5단지", "kind": "area", "zone_m2": 83387.0, "households": 890,
+   "source": "강동구청 정비사업 현황(고덕주공5단지아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_003"},
+  {"gu": "11740", "name": "고덕자이", "old": "고덕주공6단지", "kind": "area", "zone_m2": 86871.9, "households": 880,
+   "source": "강동구청 정비사업 현황(고덕주공6단지아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_004"},
+  {"gu": "11740", "name": "고덕롯데캐슬베네루체", "old": "고덕주공7단지", "kind": "area", "zone_m2": 89869.4, "households": 890,
+   "source": "강동구청 정비사업 현황(고덕주공7단지아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_005"},
+  {"gu": "11740", "name": "올림픽파크포레온", "old": "둔촌주공", "kind": "area", "zone_m2": 626232.5, "households": 5930,
+   "source": "강동구청 정비사업 현황(둔촌주공아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_006"},
+  {"gu": "11740", "name": "올림픽파크포레온", "old": "둔촌주공", "kind": "article", "pyeong": "16·23평형", "land_py": 18,
+   "source": "파이낸셜뉴스 2006-03-14 (인근 중개업소 설명, 1~4단지 중 어느 단지인지 기사에 없음, '약 18평')", "url": "https://www.fnnews.com/news/200603141437361896"},
+  {"gu": "11740", "name": "올림픽파크포레온", "old": "둔촌주공", "kind": "article", "pyeong": "25·34평형", "land_py": 29,
+   "source": "파이낸셜뉴스 2006-03-14 (인근 중개업소 설명, 1~4단지 중 어느 단지인지 기사에 없음, '약 29평')", "url": "https://www.fnnews.com/news/200603141437361896"},
+  {"gu": "11740", "name": "래미안솔베뉴", "old": "명일삼익그린1차", "kind": "area", "zone_m2": 63239.1, "households": 1560,
+   "source": "강동구청 정비사업 현황(명일삼익그린1차아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_007"},
+  {"gu": "11740", "name": "강동헤리티지자이", "old": "길동신동아1·2차", "kind": "area", "zone_m2": 46267.7, "households": 972,
+   "source": "강동구청 정비사업 현황(길동신동아1,2차아파트)", "url": "https://www.gangdong.go.kr/web/newportal/contents/gdp_005_007_002_002_008"},
+  {"gu": "11650", "name": "반포주공1단지", "old": "반포주공1단지", "kind": "article", "pyeong": "22평형", "land_py": 17,
+   "source": "서울신문 2003-06-09 「반포지구 재건축 급물살」", "url": "https://www.seoul.co.kr/news/2003/06/09/20030609022004"},
+  {"gu": "11650", "name": "래미안퍼스티지", "old": "반포주공2단지", "kind": "article", "pyeong": "18평형", "land_py": 17.7,
+   "source": "서울신문 2003-06-09 「반포지구 재건축 급물살」", "url": "https://www.seoul.co.kr/news/2003/06/09/20030609022004"},
+  {"gu": "11650", "name": "반포자이", "old": "반포주공3단지", "kind": "article", "pyeong": "16평형", "land_py": 20,
+   "source": "서울신문 2003-06-09 「반포지구 재건축 급물살」", "url": "https://www.seoul.co.kr/news/2003/06/09/20030609022004"}
+ ]
+}

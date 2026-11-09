@@ -33,6 +33,7 @@
   .tr { white-space:nowrap; }
   .num { text-align:right; white-space:nowrap; }
   .bar { height:6px; background:#93c5fd; border-radius:3px; margin-top:3px; }
+  .land { color:#166534; }
   .note { font-size:12px; color:var(--sub); margin-top:6px; }
   .label { background:#fff; border:1.5px solid #1f2937; border-radius:7px; padding:2px 6px; font-size:12px; line-height:1.3;
            white-space:nowrap; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.25); text-align:center; }
@@ -109,6 +110,10 @@ const addMonth = (m, k) => { let [y, mo] = m.split('-').map(Number); mo += k; wh
 const okSize = t => !size || band(t[1]) === size;
 const allItems = () => Object.values(loaded).flatMap(d => d.items);
 const winTrades = it => { const a = addMonth(month, -1); return it.trades.filter(t => okSize(t) && (t[0].startsWith(a) || t[0].startsWith(month))); };
+// 재건축 전 세대당 대지지분 표시 (구역면적 어림값은 '약'과 함께 표시)
+const landHtml = it => (it.land || []).map(l => l.kind === 'area'
+  ? `<div class="desc land">대지지분 약 ${l.py}평/세대 <span title="${esc(l.text)} · 도로·공원 포함이라 실제보다 큼">(구역면적 어림)</span> <a href="${esc(l.url)}" target="_blank" rel="noopener">출처</a></div>`
+  : `<div class="desc land">대지지분 ${esc(l.pyeong)} ${l.py}평 <span>(기사)</span> <a href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.source)}">출처</a></div>`).join('');
 const colorOf = id => COLORS[selected.indexOf(id) % COLORS.length];
 
 async function init() {
@@ -193,7 +198,7 @@ function renderPress() {
   document.getElementById('ptable').innerHTML = `<tr><th>기사</th><th>단지 (지금 이름 ← 재건축 전) · 평형 · 가격</th></tr>` + list.map(a => `<tr>
     <td class="tr">${a.date}<div class="desc">${esc(a.paper)}</div><div class="desc"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></div></td>
     <td>${a.rows.map(({ it, p }) => `<div><b class="pn" data-id="${esc(it.id)}" style="cursor:pointer">${selected.includes(it.id) ? `<span class="dot" style="background:${colorOf(it.id)}"></span>` : ''}${esc(it.name)}</b> <span class="desc">← ${esc(it.old.map(o => o.name).join(', '))}</span>
-      · ${p[1]}평형 · <b>${range(p)}</b> <span class="desc">(${esc(p[4])})</span>${p[5] ? `<div class="desc">${esc(p[5])}</div>` : ''}</div>`).join('')}</td></tr>`).join('');
+      · ${p[1]}평형 · <b>${range(p)}</b>${landHtml(it)} <span class="desc">(${esc(p[4])})</span>${p[5] ? `<div class="desc">${esc(p[5])}</div>` : ''}</div>`).join('')}</td></tr>`).join('');
   document.querySelectorAll('b.pn').forEach(b => b.onclick = () => toggle(b.dataset.id));
 }
 
@@ -208,7 +213,7 @@ function renderTable() {
     rows.map(r => `<tr class="${selected.includes(r.it.id) ? 'on' : ''}">
       <td class="name" data-id="${esc(r.it.id)}">${selected.includes(r.it.id) ? `<span class="dot" style="background:${colorOf(r.it.id)}"></span>` : ''}<b>${esc(r.it.name)}</b>
         <div class="desc">${gus.length > 1 ? esc(r.it.gu) + ' ' : ''}${esc(r.it.dong)} · ${r.it.buildYear}년 준공</div>
-        <div class="desc">재건축 전: ${esc(r.it.old.map(o => o.name).join(', '))}${r.it.check ? ' <span style="color:#b45309">· 연결 확인 필요</span>' : ''}</div></td>
+        <div class="desc">재건축 전: ${esc(r.it.old.map(o => o.name).join(', '))}${r.it.check ? ' <span style="color:#b45309">· 연결 확인 필요</span>' : ''}</div>${landHtml(r.it)}</td>
       <td>${r.ts.map(t => `<div class="tr">${t[0].slice(2)} · ${area(t[1])} · ${t[3] ?? '-'}층 · <b>${eok(t[2])}</b></div>`).join('')}</td>
       <td class="num"><b>${eok(r.avg)}</b><div class="desc">${r.ts.length}건</div><div class="bar" style="width:${Math.round(r.avg / max * 100)}%"></div></td></tr>`).join('') : '';
   document.getElementById('none').textContent = rows.length ? '' : '지도에 보이는 곳에서 이 시점·면적 구간에 재건축 전 거래가 없습니다. 시점이나 면적 구간을 바꾸거나 지도를 옮겨 보세요.';
@@ -233,6 +238,8 @@ function renderChart() {
     const why = !it.trades.length ? '2006년 이후 재건축 전 실거래가 없음(2006년 전에 철거)' : `${sizeName} 재건축 전 거래 없음(면적 구간을 바꿔 보세요)`;
     return `<div>· ${esc(it.name)}: ${why}${np ? ` — 신문 시세 ${np}건만 ▲로 표시` : ''}</div>`;
   }).join('');
+  document.getElementById('chartnote').innerHTML += items.filter(it => it.land).map(it =>
+    `<div style="color:#166534">· ${esc(it.name)} 재건축 전 대지지분: ${it.land.map(l => l.kind === 'area' ? `약 ${l.py}평/세대(구역면적 어림)` : `${esc(l.pyeong)} ${l.py}평(기사)`).join(', ')}</div>`).join('');
   const toX = d => { const [y, m, dd] = d.split('-').map(Number); return y + (m - 1) / 12 + dd / 365; };
   const [y, m] = month.split('-').map(Number);
   // 전용면적을 소수점 첫째 자리까지 같으면 하나로 묶는다 (예: 106.25㎡와 106.26㎡ → 106.2㎡ 묶음)
@@ -339,7 +346,7 @@ function drawLabels() {
     const avg = ts.length ? ts.reduce((s, t) => s + t[2], 0) / ts.length : 0;
     o.el.className = 'label' + (ts.length ? '' : ' off') + (sel ? ' sel' : '');
     o.el.innerHTML = `${esc(o.it.name)}${ts.length ? `<br><span class="p">${eok(avg)}</span> <span class="desc">${ts.length > 1 ? ts.length + '건 평균' : '전용 ' + ts[0][1].toFixed(2) + '㎡'}</span>` : ''}`;
-    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ') + (o.it.press ? ' · 2006년 이전 신문 시세 있음' : '') + (o.it.note ? ' · ' + o.it.note : '');
+    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ') + (o.it.press ? ' · 2006년 이전 신문 시세 있음' : '') + (o.it.note ? ' · ' + o.it.note : '') + (o.it.land ? ' · 대지지분 ' + o.it.land.map(l => (l.kind === 'area' ? '약 ' : l.pyeong + ' ') + l.py + '평').join(', ') : '');
     o.setZIndex(sel ? 30 : ts.length ? 20 : 1);
   }
 }
