@@ -137,6 +137,13 @@ def add_press(lawd, gu, cs, items):
                       "old": [{"name": c["old"], "names": [c["old"]], "buildYear": None, "jibun": None,
                                "first": None, "last": None, "count": 0}],
                       "trades": [], "note": c.get("note", "")}
+            # 옛 단지가 2006년 이후에도 거래되었다면(예: 반포주공1단지) 그 실거래가도 붙인다
+            for x in cs:
+                if x["dong"] == c["dong"] and c["old"] in x["names"]:
+                    target["trades"] += [[r["date"], r["excluUseAr"], r["dealAmount"], r["floor"], x["name"]] for r in x["rows"]]
+                    target["old"][0].update({"buildYear": x["buildYear"], "jibun": x["jibun"],
+                                             "first": x["first"], "last": x["last"], "count": x["count"]})
+            target["trades"].sort()
             items.append(target)
         target["press"] = sorted(target.get("press", []) + pts)
         print(f"   [신문 시세] {target['name']} ← {c['old']} {len(pts)}건")

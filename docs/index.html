@@ -78,6 +78,7 @@
   <div class="box" id="cmp" hidden>
     <h2>고른 단지의 재건축 전 시세 흐름</h2>
     <div id="chartbox"><canvas id="chart"></canvas></div>
+    <div class="note" id="chartnote" style="color:#b45309"></div>
     <div class="note">표의 단지 이름이나 지도 이름표를 누르면 그래프에 넣고 뺄 수 있습니다. 그래프의 점을 누르면 그 시점으로 이동합니다. 세로: 억 원.</div>
   </div>
 
@@ -222,6 +223,14 @@ function renderChart() {
   document.getElementById('cmp').hidden = !items.length;
   if (chart) { chart.destroy(); chart = null; }
   if (!items.length) return;
+  // 그래프에 점이 없거나 적은 단지는 이유를 적는다
+  const sizeName = SIZES.find(s => s[1] === size)[0];
+  document.getElementById('chartnote').innerHTML = items.map(it => {
+    const n = it.trades.filter(okSize).length, np = (it.press || []).length;
+    if (n) return '';
+    const why = !it.trades.length ? '2006년 이후 재건축 전 실거래가 없음(2006년 전에 철거)' : `${sizeName} 재건축 전 거래 없음(평형대를 바꿔 보세요)`;
+    return `<div>· ${esc(it.name)}: ${why}${np ? ` — 신문 시세 ${np}건만 ▲로 표시` : ''}</div>`;
+  }).join('');
   const toX = d => { const [y, m, dd] = d.split('-').map(Number); return y + (m - 1) / 12 + dd / 365; };
   const [y, m] = month.split('-').map(Number);
   chart = new Chart(document.getElementById('chart'), {
@@ -230,7 +239,8 @@ function renderChart() {
       ...items.map(it => ({ label: it.name, backgroundColor: colorOf(it.id), pointRadius: 3,
         data: it.trades.filter(okSize).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) })),
       ...items.filter(it => it.press).map(it => ({ label: it.name + ' (신문 시세)', backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
-        pointStyle: 'triangle', pointRadius: 7,
+        pointStyle: 'triangle', pointRadius: 9, borderWidth: 2, borderColor: '#111827',
+        order: -1,
         data: it.press.map(p => ({ x: toX(p[0]), y: (p[2] + p[3]) / 2 / 10000, p, it })) })),
     ] },
     options: { maintainAspectRatio: false, animation: false,
