@@ -235,17 +235,25 @@ function renderChart() {
   }).join('');
   const toX = d => { const [y, m, dd] = d.split('-').map(Number); return y + (m - 1) / 12 + dd / 365; };
   const [y, m] = month.split('-').map(Number);
-  const nSets = items.reduce((n, it) => n + new Set(it.trades.filter(okSize).map(t => t[1])).size + (it.press ? 1 : 0), 0);
+  // 전용면적을 소수점 첫째 자리까지 같으면 하나로 묶는다 (예: 106.25㎡와 106.26㎡ → 106.2㎡ 묶음)
+  const akey = a => Math.floor(a * 10 + 1e-6) / 10;
+  const nSets = items.reduce((n, it) => n + new Set(it.trades.filter(okSize).map(t => akey(t[1]))).size + (it.press ? 1 : 0), 0);
   document.getElementById('chartbox').style.height = Math.min(700, 300 + nSets * 14) + 'px';   // 범례가 많으면 그래프 칸을 키운다
   chart = new Chart(document.getElementById('chart'), {
     type: 'scatter',
     data: { datasets: [
-      // 단지 × 정확한 전용면적마다 따로 표시 (색은 단지, 모양은 전용면적)
+      // 단지 × 전용면적(소수점 첫째 자리까지 같은 면적은 한 묶음)마다 따로 표시 (색은 단지, 모양은 면적)
       ...items.flatMap(it => {
-        const areas = [...new Set(it.trades.filter(okSize).map(t => t[1]))].sort((a, b) => a - b);
-        return areas.map((a, k) => ({ label: `${it.name} · 전용 ${a.toFixed(2)}㎡`, backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
-          pointStyle: STYLES[k % STYLES.length], pointRadius: 4,
-          data: it.trades.filter(t => t[1] === a).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) }));
+        const ts = it.trades.filter(okSize);
+        const keys = [...new Set(ts.map(t => akey(t[1])))].sort((a, b) => a - b);
+        return keys.map((k, i) => {
+          const g = ts.filter(t => akey(t[1]) === k);
+          const ex = [...new Set(g.map(t => t[1]))].sort((a, b) => a - b);   // 묶음 안의 실제 면적
+          const lab = ex.length > 1 ? `${ex[0].toFixed(2)}~${ex.at(-1).toFixed(2)}` : ex[0].toFixed(2);
+          return { label: `${it.name} · 전용 ${lab}㎡`, backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
+            pointStyle: STYLES[i % STYLES.length], pointRadius: 4,
+            data: g.map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) };
+        });
       }),
       ...items.filter(it => it.press).map(it => ({ label: `${it.name} · 신문 시세 ${[...new Set(it.press.map(p => p[1]))].join('·')}평형(공급, 기사 표기)`, backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
         pointStyle: 'triangle', pointRadius: 9, borderWidth: 2, borderColor: '#111827',
