@@ -105,6 +105,43 @@ def find_pairs(cs, manual):
     return list(merged.values())
 
 
+PRESS = os.path.join(ROOT, "press.json")
+
+
+def add_press(lawd, gu, cs, items):
+    """press.json(2006년 이전 신문 시세)을 단지에 붙인다. 실거래가가 없는 단지는 새로 만든다."""
+    if not os.path.exists(PRESS):
+        return
+    press = json.load(open(PRESS, encoding="utf-8"))
+    for c in [c for c in press["complexes"] if c["gu"] == lawd]:
+        pts = []
+        for a in press["articles"]:
+            for p in a["prices"]:
+                if p["key"] == c["key"]:
+                    pts.append([a["date"], p["pyeong"], p["low"], p["high"], p["kind"], p.get("memo", ""),
+                                a["paper"], a["title"], a["url"]])
+        if not pts:
+            continue
+        target = next((it for it in items if c["new"] and it["name"] == c["new"]), None)
+        if target is None:
+            # 지도 위치: 새 단지(없으면 옛 단지)의 지번
+            name = c["new"] or c["old"]
+            found = sorted([x for x in cs if x["dong"] == c["dong"] and name in x["names"]], key=lambda x: -x["count"])
+            if not found:
+                print(f"   [신문 시세 단지 위치 못 찾음] {c['dong']} {name}")
+                continue
+            f = found[0]
+            target = {"id": f"{lawd}-press-{c['key']}", "name": c["new"] or c["old"], "check": False,
+                      "dong": c["dong"], "jibun": f["jibun"], "address": f"서울특별시 {gu} {c['dong']} {f['jibun']}",
+                      "buildYear": f["buildYear"] if c["new"] else None,
+                      "old": [{"name": c["old"], "names": [c["old"]], "buildYear": None, "jibun": None,
+                               "first": None, "last": None, "count": 0}],
+                      "trades": [], "note": c.get("note", "")}
+            items.append(target)
+        target["press"] = sorted(target.get("press", []) + pts)
+        print(f"   [신문 시세] {target['name']} ← {c['old']} {len(pts)}건")
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     manual_all = json.load(open(MAPPING, encoding="utf-8")) if os.path.exists(MAPPING) else []
@@ -140,6 +177,7 @@ def main():
                         for o in sorted(olds, key=lambda o: o["name"])],
                 "trades": trades,
             })
+        add_press(lawd, gu, cs, items)
         items.sort(key=lambda it: (it["dong"], it["name"]))
         with open(os.path.join(OUT, f"{lawd}.json"), "w", encoding="utf-8") as f:
             json.dump({"gu": gu, "items": items}, f, ensure_ascii=False, separators=(",", ":"))

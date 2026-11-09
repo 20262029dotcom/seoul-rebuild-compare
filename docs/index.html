@@ -69,6 +69,12 @@
     <div class="note" id="none"></div>
   </div>
 
+  <div class="box" id="pressbox" hidden>
+    <h2>2006년 이전 신문 시세 <span class="desc">(실거래가 아님)</span></h2>
+    <div class="desc">실거래가 신고(2006년)가 시작되기 전, 신문 기사에 나온 단지·평형별 가격입니다. 같은 기사에 함께 나온 단지는 같은 시점 비교로 볼 수 있습니다. 평형은 기사 표기(공급평형)입니다. 지도에 보이는 단지만 나옵니다.</div>
+    <div class="scroll"><table id="ptable"></table></div>
+  </div>
+
   <div class="box" id="cmp" hidden>
     <h2>고른 단지의 재건축 전 시세 흐름</h2>
     <div id="chartbox"><canvas id="chart"></canvas></div>
@@ -172,7 +178,21 @@ function visible(it) {
   return map.getBounds().contain(new kakao.maps.LatLng(p[0], p[1]));
 }
 
-function refresh() { drawLabels(); renderTable(); renderChart(); }
+function refresh() { drawLabels(); renderTable(); renderPress(); renderChart(); }
+
+function renderPress() {
+  const its = allItems().filter(it => it.press && visible(it));
+  const arts = {};
+  its.forEach(it => it.press.forEach(p => { (arts[p[8]] ||= { date: p[0], paper: p[6], title: p[7], url: p[8], rows: [] }).rows.push({ it, p }); }));
+  const list = Object.values(arts).sort((a, b) => b.date.localeCompare(a.date));
+  document.getElementById('pressbox').hidden = !list.length;
+  const range = p => p[2] === p[3] ? eok(p[2]) : `${eok(p[2])} ~ ${eok(p[3])}`;
+  document.getElementById('ptable').innerHTML = `<tr><th>기사</th><th>단지 (지금 이름 ← 재건축 전) · 평형 · 가격</th></tr>` + list.map(a => `<tr>
+    <td class="tr">${a.date}<div class="desc">${esc(a.paper)}</div><div class="desc"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a></div></td>
+    <td>${a.rows.map(({ it, p }) => `<div><b class="pn" data-id="${esc(it.id)}" style="cursor:pointer">${selected.includes(it.id) ? `<span class="dot" style="background:${colorOf(it.id)}"></span>` : ''}${esc(it.name)}</b> <span class="desc">← ${esc(it.old.map(o => o.name).join(', '))}</span>
+      · ${p[1]}평형 · <b>${range(p)}</b> <span class="desc">(${esc(p[4])})</span>${p[5] ? `<div class="desc">${esc(p[5])}</div>` : ''}</div>`).join('')}</td></tr>`).join('');
+  document.querySelectorAll('b.pn').forEach(b => b.onclick = () => toggle(b.dataset.id));
+}
 
 function renderTable() {
   const rows = allItems().filter(visible).map(it => ({ it, ts: winTrades(it) })).filter(r => r.ts.length);
@@ -206,13 +226,20 @@ function renderChart() {
   const [y, m] = month.split('-').map(Number);
   chart = new Chart(document.getElementById('chart'), {
     type: 'scatter',
-    data: { datasets: items.map(it => ({ label: it.name, backgroundColor: colorOf(it.id), pointRadius: 3,
-      data: it.trades.filter(okSize).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) })) },
+    data: { datasets: [
+      ...items.map(it => ({ label: it.name, backgroundColor: colorOf(it.id), pointRadius: 3,
+        data: it.trades.filter(okSize).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) })),
+      ...items.filter(it => it.press).map(it => ({ label: it.name + ' (신문 시세)', backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
+        pointStyle: 'triangle', pointRadius: 7,
+        data: it.press.map(p => ({ x: toX(p[0]), y: (p[2] + p[3]) / 2 / 10000, p, it })) })),
+    ] },
     options: { maintainAspectRatio: false, animation: false,
       scales: { x: { ticks: { callback: v => Math.floor(v) + '년', stepSize: 1 } }, y: { title: { display: true, text: '억 원' } } },
-      onClick: (e, els) => { if (els.length) { const t = chart.data.datasets[els[0].datasetIndex].data[els[0].index].t; setMonth(t[0].slice(0, 7)); } },
+      onClick: (e, els) => { if (els.length) { const t = chart.data.datasets[els[0].datasetIndex].data[els[0].index].t; if (t) setMonth(t[0].slice(0, 7)); } },
       plugins: {
-        tooltip: { callbacks: { label: c => `${c.raw.it.name} ${c.raw.t[0]} ${area(c.raw.t[1])} ${c.raw.t[3] ?? '-'}층 ${eok(c.raw.t[2])}` } },
+        tooltip: { callbacks: { label: c => c.raw.p
+          ? `${c.raw.it.name} ${c.raw.p[0]} ${c.raw.p[1]}평형 ${eok(c.raw.p[2])}${c.raw.p[2] !== c.raw.p[3] ? '~' + eok(c.raw.p[3]) : ''} (${c.raw.p[6]} ${c.raw.p[4]})`
+          : `${c.raw.it.name} ${c.raw.t[0]} ${area(c.raw.t[1])} ${c.raw.t[3] ?? '-'}층 ${eok(c.raw.t[2])}` } },
       } },
     plugins: [{ id: 'now', afterDraw: c => {   // 지금 고른 시점 표시
       const a = c.chartArea, g = c.ctx;
@@ -284,7 +311,7 @@ function drawLabels() {
     const avg = ts.length ? ts.reduce((s, t) => s + t[2], 0) / ts.length : 0;
     o.el.className = 'label' + (ts.length ? '' : ' off') + (sel ? ' sel' : '');
     o.el.innerHTML = `${esc(o.it.name)}${ts.length ? `<br><span class="p">${eok(avg)}</span> <span class="desc">${ts.length > 1 ? ts.length + '건 평균' : '약 ' + pyeong(ts[0][1]) + '평형'}</span>` : ''}`;
-    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ');
+    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ') + (o.it.press ? ' · 2006년 이전 신문 시세 있음' : '') + (o.it.note ? ' · ' + o.it.note : '');
     o.setZIndex(sel ? 30 : ts.length ? 20 : 1);
   }
 }
