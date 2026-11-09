@@ -83,7 +83,7 @@
   </div>
 
   <div class="note" style="padding:6px 4px 20px">
-    평형은 실거래가 자료의 <b>전용면적</b>을 그대로 적고, 괄호 안 공급평형은 전용면적 × 1.3 ÷ 3.3058로 어림한 값입니다(실제와 1~2평 다를 수 있음).
+    면적은 실거래가 자료의 <b>전용면적</b>을 그대로 적고, 괄호 안은 전용면적을 평으로 바꾼 값(÷3.3058)입니다. 면적 구간도 전용면적 기준입니다. 신문 시세만 기사 표기(공급평형)입니다.
     이름은 지금(재건축 후) 이름이고, 회색 글씨가 재건축 전 이름입니다.
     자료: 국토교통부 아파트 매매 실거래가(2006년~), 해제된 거래 제외.
   </div>
@@ -93,16 +93,18 @@
 <script>
 const KAKAO_JS_KEY = '997b87d7a5a35bc160624fba963badb2';
 const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#4b5563'];
-const SIZES = [['전체', 0], ['10평대', 10], ['20평대', 20], ['30평대', 30], ['40평대', 40], ['50평 이상', 50]];
+// 전용면적 구간 (실거래가 자료의 전용면적 그대로 묶음)
+const SIZES = [['전체', 0], ['전용 60㎡ 이하', 1], ['60~85㎡', 2], ['85~102㎡', 3], ['102~135㎡', 4], ['135㎡ 초과', 5]];
+const STYLES = ['circle', 'rect', 'rectRot', 'crossRot', 'star', 'rectRounded', 'cross', 'line'];
 
-let index = [], loaded = {}, size = 30, month = null, MONTHS = [], selected = [], focusGu = null;
+let index = [], loaded = {}, size = 2, month = null, MONTHS = [], selected = [], focusGu = null;
 let map = null, overlays = {}, coords = {}, chart = null, geocoder = null;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pyeong = a => Math.round(a * 1.3 / 3.3058);
-const band = a => { const p = pyeong(a); return p >= 50 ? 50 : Math.floor(p / 10) * 10; };
+const jpy = a => (a / 3.3058).toFixed(1);   // 전용면적을 평으로 (어림 아님, 단순 환산)
+const band = a => a <= 60 ? 1 : a <= 85 ? 2 : a <= 102 ? 3 : a <= 135 ? 4 : 5;
 const eok = m => (m / 10000).toFixed(m >= 100000 ? 1 : 2).replace(/\.?0+$/, '') + '억';
-const area = a => `전용 ${a.toFixed(2)}㎡ (약 ${pyeong(a)}평형)`;
+const area = a => `전용 ${a.toFixed(2)}㎡ (${jpy(a)}평)`;
 const addMonth = (m, k) => { let [y, mo] = m.split('-').map(Number); mo += k; while (mo > 12) { mo -= 12; y++; } while (mo < 1) { mo += 12; y--; } return `${y}-${String(mo).padStart(2, '0')}`; };
 const okSize = t => !size || band(t[1]) === size;
 const allItems = () => Object.values(loaded).flatMap(d => d.items);
@@ -154,7 +156,7 @@ async function goGu(code, move) {
   refresh();
 }
 
-// 처음 시점: 그 구에서 고른 평형대로 거래된 단지가 가장 많은 2개월
+// 처음 시점: 그 구에서 고른 면적 구간으로 거래된 단지가 가장 많은 2개월
 function bestMonth(items) {
   let best = MONTHS.at(-1), bestN = -1;
   for (const m of MONTHS) {
@@ -209,7 +211,7 @@ function renderTable() {
         <div class="desc">재건축 전: ${esc(r.it.old.map(o => o.name).join(', '))}${r.it.check ? ' <span style="color:#b45309">· 연결 확인 필요</span>' : ''}</div></td>
       <td>${r.ts.map(t => `<div class="tr">${t[0].slice(2)} · ${area(t[1])} · ${t[3] ?? '-'}층 · <b>${eok(t[2])}</b></div>`).join('')}</td>
       <td class="num"><b>${eok(r.avg)}</b><div class="desc">${r.ts.length}건</div><div class="bar" style="width:${Math.round(r.avg / max * 100)}%"></div></td></tr>`).join('') : '';
-  document.getElementById('none').textContent = rows.length ? '' : '지도에 보이는 곳에서 이 시점·평형대에 재건축 전 거래가 없습니다. 시점이나 평형대를 바꾸거나 지도를 옮겨 보세요.';
+  document.getElementById('none').textContent = rows.length ? '' : '지도에 보이는 곳에서 이 시점·면적 구간에 재건축 전 거래가 없습니다. 시점이나 면적 구간을 바꾸거나 지도를 옮겨 보세요.';
   document.querySelectorAll('td.name').forEach(td => td.onclick = () => toggle(td.dataset.id));
 }
 
@@ -228,17 +230,24 @@ function renderChart() {
   document.getElementById('chartnote').innerHTML = items.map(it => {
     const n = it.trades.filter(okSize).length, np = (it.press || []).length;
     if (n) return '';
-    const why = !it.trades.length ? '2006년 이후 재건축 전 실거래가 없음(2006년 전에 철거)' : `${sizeName} 재건축 전 거래 없음(평형대를 바꿔 보세요)`;
+    const why = !it.trades.length ? '2006년 이후 재건축 전 실거래가 없음(2006년 전에 철거)' : `${sizeName} 재건축 전 거래 없음(면적 구간을 바꿔 보세요)`;
     return `<div>· ${esc(it.name)}: ${why}${np ? ` — 신문 시세 ${np}건만 ▲로 표시` : ''}</div>`;
   }).join('');
   const toX = d => { const [y, m, dd] = d.split('-').map(Number); return y + (m - 1) / 12 + dd / 365; };
   const [y, m] = month.split('-').map(Number);
+  const nSets = items.reduce((n, it) => n + new Set(it.trades.filter(okSize).map(t => t[1])).size + (it.press ? 1 : 0), 0);
+  document.getElementById('chartbox').style.height = Math.min(700, 300 + nSets * 14) + 'px';   // 범례가 많으면 그래프 칸을 키운다
   chart = new Chart(document.getElementById('chart'), {
     type: 'scatter',
     data: { datasets: [
-      ...items.map(it => ({ label: it.name, backgroundColor: colorOf(it.id), pointRadius: 3,
-        data: it.trades.filter(okSize).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) })),
-      ...items.filter(it => it.press).map(it => ({ label: it.name + ' (신문 시세)', backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
+      // 단지 × 정확한 전용면적마다 따로 표시 (색은 단지, 모양은 전용면적)
+      ...items.flatMap(it => {
+        const areas = [...new Set(it.trades.filter(okSize).map(t => t[1]))].sort((a, b) => a - b);
+        return areas.map((a, k) => ({ label: `${it.name} · 전용 ${a.toFixed(2)}㎡`, backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
+          pointStyle: STYLES[k % STYLES.length], pointRadius: 4,
+          data: it.trades.filter(t => t[1] === a).map(t => ({ x: toX(t[0]), y: t[2] / 10000, t, it })) }));
+      }),
+      ...items.filter(it => it.press).map(it => ({ label: `${it.name} · 신문 시세 ${[...new Set(it.press.map(p => p[1]))].join('·')}평형(공급, 기사 표기)`, backgroundColor: colorOf(it.id), borderColor: colorOf(it.id),
         pointStyle: 'triangle', pointRadius: 9, borderWidth: 2, borderColor: '#111827',
         order: -1,
         data: it.press.map(p => ({ x: toX(p[0]), y: (p[2] + p[3]) / 2 / 10000, p, it })) })),
@@ -247,6 +256,7 @@ function renderChart() {
       scales: { x: { ticks: { callback: v => Math.floor(v) + '년', stepSize: 1 } }, y: { title: { display: true, text: '억 원' } } },
       onClick: (e, els) => { if (els.length) { const t = chart.data.datasets[els[0].datasetIndex].data[els[0].index].t; if (t) setMonth(t[0].slice(0, 7)); } },
       plugins: {
+        legend: { labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
         tooltip: { callbacks: { label: c => c.raw.p
           ? `${c.raw.it.name} ${c.raw.p[0]} ${c.raw.p[1]}평형 ${eok(c.raw.p[2])}${c.raw.p[2] !== c.raw.p[3] ? '~' + eok(c.raw.p[3]) : ''} (${c.raw.p[6]} ${c.raw.p[4]})`
           : `${c.raw.it.name} ${c.raw.t[0]} ${area(c.raw.t[1])} ${c.raw.t[3] ?? '-'}층 ${eok(c.raw.t[2])}` } },
@@ -276,7 +286,7 @@ function initMap() {
   document.head.appendChild(s);
 }
 
-// 지도를 옮기면 화면 가운데의 구를 찾아 그 구 자료를 불러온다 (시점·평형대는 그대로)
+// 지도를 옮기면 화면 가운데의 구를 찾아 그 구 자료를 불러온다 (시점·면적 구간은 그대로)
 function onMove() {
   const c = map.getCenter();
   geocoder.coord2RegionCode(c.getLng(), c.getLat(), async (r, st) => {
@@ -320,7 +330,7 @@ function drawLabels() {
     const ts = winTrades(o.it), sel = selected.includes(o.it.id);
     const avg = ts.length ? ts.reduce((s, t) => s + t[2], 0) / ts.length : 0;
     o.el.className = 'label' + (ts.length ? '' : ' off') + (sel ? ' sel' : '');
-    o.el.innerHTML = `${esc(o.it.name)}${ts.length ? `<br><span class="p">${eok(avg)}</span> <span class="desc">${ts.length > 1 ? ts.length + '건 평균' : '약 ' + pyeong(ts[0][1]) + '평형'}</span>` : ''}`;
+    o.el.innerHTML = `${esc(o.it.name)}${ts.length ? `<br><span class="p">${eok(avg)}</span> <span class="desc">${ts.length > 1 ? ts.length + '건 평균' : '전용 ' + ts[0][1].toFixed(2) + '㎡'}</span>` : ''}`;
     o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ') + (o.it.press ? ' · 2006년 이전 신문 시세 있음' : '') + (o.it.note ? ' · ' + o.it.note : '');
     o.setZIndex(sel ? 30 : ts.length ? 20 : 1);
   }
