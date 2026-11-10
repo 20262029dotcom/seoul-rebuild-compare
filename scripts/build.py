@@ -109,7 +109,7 @@ PRESS = os.path.join(ROOT, "press.json")
 LAND = os.path.join(ROOT, "land.json")
 
 
-def add_land(lawd, items):
+def add_land(lawd, gu, cs, items):
     """재건축 전 세대당 대지지분 = 새 단지 대지면적(건축물대장) ÷ 재건축 전 세대수(land.json)."""
     if not os.path.exists(LAND):
         return
@@ -118,6 +118,14 @@ def add_land(lawd, items):
         if d["gu"] != lawd:
             continue
         it = next((x for x in items if x["name"] == d["name"]), None)
+        if it is None:   # 2006년 전에 철거되어 재건축 전 거래가 없는 단지: 지금 단지 위치로 대지지분만 표시
+            f = max([c for c in cs if d["name"] in c["names"]], key=lambda c: c["count"], default=None)
+            if f:
+                it = {"id": f"{lawd}-{f['dong']}-{f['jibun']}-{f['buildYear']}", "name": d["name"], "check": False,
+                      "dong": f["dong"], "jibun": f["jibun"], "address": f"서울특별시 {gu} {f['dong']} {f['jibun']}",
+                      "buildYear": f["buildYear"], "old": [{"name": d["old"], "names": [d["old"]], "buildYear": None,
+                      "jibun": None, "first": None, "last": None, "count": 0}], "trades": []}
+                items.append(it)
         a = areas.get(it["id"]) if it else None
         if not a:
             print(f"   [대지지분 못 냄] {d['name']} (단지 또는 대지면적 없음)")
@@ -205,7 +213,7 @@ def main():
                 "trades": trades,
             })
         add_press(lawd, gu, cs, items)
-        add_land(lawd, items)
+        add_land(lawd, gu, cs, items)
         items.sort(key=lambda it: (it["dong"], it["name"]))
         with open(os.path.join(OUT, f"{lawd}.json"), "w", encoding="utf-8") as f:
             json.dump({"gu": gu, "items": items}, f, ensure_ascii=False, separators=(",", ":"))
