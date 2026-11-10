@@ -129,7 +129,7 @@ const allItems = () => Object.values(loaded).flatMap(d => d.items);
 const winTrades = it => { const a = addMonth(month, -1); return it.trades.filter(t => okSize(t) && (t[0].startsWith(a) || t[0].startsWith(month))); };
 // 재건축 전 세대당 대지지분 = 새 단지 대지면적(건축물대장) ÷ 재건축 전 세대수
 const landText = l => `대지지분 약 ${l.py}평/세대`;
-const landHtml = it => it.land ? `<div class="desc land">${landText(it.land)} <span title="새 단지 대지면적 ${it.land.plat.toLocaleString()}㎡ ÷ 재건축 전 ${it.land.hh.toLocaleString()}세대(${esc(it.land.source)})">(대지 ${Math.round(it.land.plat).toLocaleString()}㎡ ÷ ${it.land.hh.toLocaleString()}세대)</span> <a href="${esc(it.land.url)}" target="_blank" rel="noopener">세대수 출처</a></div>` : '';
+const landHtml = it => it.land ? `<div class="desc land">${landText(it.land)} <span title="새 단지 대지면적 ${it.land.plat.toLocaleString()}㎡ ÷ 재건축 전 ${it.land.hh.toLocaleString()}세대(${esc(it.land.source)})">(대지 ${Math.round(it.land.plat).toLocaleString()}㎡ ÷ ${it.land.hh.toLocaleString()}세대)</span> ${it.land.url ? `<a href="${esc(it.land.url)}" target="_blank" rel="noopener">세대수 출처</a>` : `<span>세대수: ${esc(it.land.source)}</span>`}</div>` : '';
 const colorOf = id => COLORS[selected.indexOf(id) % COLORS.length];
 
 async function init() {
