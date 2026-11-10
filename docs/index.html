@@ -43,47 +43,63 @@
   .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   .scroll { overflow-x:auto; }
   #chartbox { height:280px; }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .tabs { display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; flex-shrink:0; }
+  .tabs button { border:0; background:#fff; font-size:13px; padding:5px 11px; cursor:pointer; color:var(--sub); }
+  .tabs button.on { background:var(--ink); color:#fff; }
+  body.now .past { display:none !important; }
+  body:not(.now) .nowonly { display:none !important; }
+  .stats { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin:8px 0; }
+  .stat { border:1px solid var(--line); border-radius:10px; padding:9px 10px; }
+  .stat .k { font-size:12px; color:var(--sub); }
+  .stat .v { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .stat .f { font-size:11px; color:var(--sub); }
+  .label .g { font-weight:700; color:#166534; }
 </style>
 </head>
 <body>
 <header>
-  <h1>서울 재건축 아파트 · 재건축 전 실거래가 비교</h1>
-  <div class="row">
+  <div class="top"><h1 id="h1">서울 재건축 아파트 · 재건축 전 실거래가 비교</h1>
+    <div class="tabs"><button id="tPast" class="on">재건축 전</button><button id="tNow">현재</button></div></div>
+  <div class="row past">
     <select id="gu"></select>
     <span id="sizes"></span>
   </div>
-  <div class="time">
+  <div class="time past">
     <button class="nav" id="prev">◀</button>
     <input type="range" id="slider">
     <button class="nav" id="next">▶</button>
   </div>
-  <div class="row" style="justify-content:center;margin-top:2px"><b id="when"></b></div>
+  <div class="row past" style="justify-content:center;margin-top:2px"><b id="when"></b></div>
+  <div class="row nowonly"><span class="desc">지도에서 아파트 이름표를 누르면 지금(재건축 후) 단지의 대지지분과 최근 실거래가를 봅니다.</span></div>
 </header>
 <main>
   <div id="map"></div>
   <div id="mapmsg"></div>
 
-  <div class="box">
+  <div class="box nowonly" id="nowbox"></div>
+
+  <div class="box past">
     <h2 id="title">이 시점의 재건축 전 시세</h2>
     <div class="desc">지도에 보이는 단지 가운데, 고른 2개월 동안 재건축 전(옛 단지)으로 거래된 단지를 가격순으로 보여 줍니다. 지도를 옮기면 같은 시점으로 다른 구를 볼 수 있습니다.</div>
     <div class="scroll"><table id="table"></table></div>
     <div class="note" id="none"></div>
   </div>
 
-  <div class="box" id="pressbox" hidden>
+  <div class="box past" id="pressbox" hidden>
     <h2>2006년 이전 신문 시세 <span class="desc">(실거래가 아님)</span></h2>
     <div class="desc">실거래가 신고(2006년)가 시작되기 전, 신문 기사에 나온 단지·평형별 가격입니다. 같은 기사에 함께 나온 단지는 같은 시점 비교로 볼 수 있습니다. 평형은 기사 표기(공급평형)입니다. 지도에 보이는 단지만 나옵니다.</div>
     <div class="scroll"><table id="ptable"></table></div>
   </div>
 
-  <div class="box" id="cmp" hidden>
+  <div class="box past" id="cmp" hidden>
     <h2>고른 단지의 재건축 전 시세 흐름</h2>
     <div id="chartbox"><canvas id="chart"></canvas></div>
     <div class="note" id="chartnote" style="color:#b45309"></div>
     <div class="note">표의 단지 이름이나 지도 이름표를 누르면 그래프에 넣고 뺄 수 있습니다. 그래프의 점을 누르면 그 시점으로 이동합니다. 세로: 억 원.</div>
   </div>
 
-  <div class="note" style="padding:6px 4px 20px">
+  <div class="note past" style="padding:6px 4px 20px">
     면적은 실거래가 자료의 <b>전용면적</b>을 그대로 적고, 괄호 안은 전용면적을 평으로 바꾼 값(÷3.3058)입니다. 면적 구간도 전용면적 기준입니다. 신문 시세만 기사 표기(공급평형)입니다.
     이름은 지금(재건축 후) 이름이고, 회색 글씨가 재건축 전 이름입니다.
     자료: 국토교통부 아파트 매매 실거래가(2006년~), 해제된 거래 제외.
@@ -98,6 +114,7 @@ const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2'
 const SIZES = [['전체', 0], ['전용 60㎡ 이하', 1], ['60~85㎡', 2], ['85~102㎡', 3], ['102~135㎡', 4], ['135㎡ 초과', 5]];
 const STYLES = ['circle', 'rect', 'rectRot', 'crossRot', 'star', 'rectRounded', 'cross', 'line'];
 
+let mode = 'past', nowId = null;
 let index = [], loaded = {}, size = 2, month = null, MONTHS = [], selected = [], focusGu = null;
 let map = null, overlays = {}, coords = {}, chart = null, geocoder = null;
 
@@ -132,6 +149,12 @@ async function init() {
   sl.oninput = () => setMonth(MONTHS[+sl.value]);
   document.getElementById('prev').onclick = () => setMonth(MONTHS[Math.max(0, MONTHS.indexOf(month) - 1)]);
   document.getElementById('next').onclick = () => setMonth(MONTHS[Math.min(MONTHS.length - 1, MONTHS.indexOf(month) + 1)]);
+  const tab = m => () => { mode = m; document.body.classList.toggle('now', m === 'now');
+    document.getElementById('tPast').classList.toggle('on', m === 'past'); document.getElementById('tNow').classList.toggle('on', m === 'now');
+    document.getElementById('h1').textContent = m === 'now' ? '서울 아파트 · 현재 대지지분과 실거래가' : '서울 재건축 아파트 · 재건축 전 실거래가 비교';
+    if (map) { Object.values(overlays).forEach(o => o.setMap(m === 'now' ? null : map)); Object.values(nowOverlays).forEach(o => o.setMap(m === 'now' ? map : null)); }
+    if (m === 'now' && focusGu) placeNow(focusGu); refresh(); };
+  document.getElementById('tPast').onclick = tab('past'); document.getElementById('tNow').onclick = tab('now');
   initMap();
   const start = index.find(g => g.code === '11650' && g.count) || index.find(g => g.count);
   if (start) { sel.value = start.code; await goGu(start.code, true); }
@@ -185,7 +208,55 @@ function visible(it) {
   return map.getBounds().contain(new kakao.maps.LatLng(p[0], p[1]));
 }
 
-function refresh() { drawLabels(); renderTable(); renderPress(); renderChart(); }
+function refresh() { drawLabels(); if (mode === 'now') return renderNow(); renderTable(); renderPress(); renderChart(); }
+
+// ── 현재 탭: 서울의 지금 아파트 전체 (now_<구>.json) ──
+const PY = 3.3058;
+const man = v => Math.round(v).toLocaleString() + '만원';
+let nowLoaded = {}, nowOverlays = {};
+const nowAvg = n => n.plat / n.hh / PY;   // ① 평균 대지지분(평/세대)
+async function loadNow(code) {
+  if (!nowLoaded[code]) {
+    const d = await fetch(`data/now_${code}.json`).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }));
+    d.items.forEach(it => { it.gu = d.gu; it.code = code; });
+    nowLoaded[code] = d;
+  }
+  return nowLoaded[code];
+}
+async function placeNow(code) {
+  if (!map) return;
+  for (const it of (await loadNow(code)).items) {
+    if (nowOverlays[it.id]) continue;
+    const p = await geocode(it.address);
+    if (!p) continue;
+    const el = document.createElement('div');
+    el.className = 'label';
+    el.innerHTML = `${esc(it.name)}<br><span class="g">${nowAvg(it).toFixed(1)}평</span>`;
+    el.onclick = () => { nowId = it.id; drawLabels(); renderNow(); };
+    const o = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p[0], p[1]), content: el, yAnchor: 1.15, clickable: true });
+    o.el = el; o.it = it; nowOverlays[it.id] = o;
+    if (mode === 'now') o.setMap(map);
+  }
+}
+function renderNow() {
+  const box = document.getElementById('nowbox');
+  const it = Object.values(nowLoaded).flatMap(d => d.items).find(x => x.id === nowId);
+  if (!it) { box.innerHTML = '<div class="desc">지도에서 아파트 이름표를 눌러 보세요. 초록 숫자는 평균 대지지분(평/세대)입니다. 처음 여는 구는 위치를 찾느라 이름표가 천천히 나타납니다.</div>'; return; }
+  const avg = nowAvg(it), ratio = it.excl ? it.plat / it.excl : null, t = it.recent[0], tpy = t[1] / PY;
+  const stat = (k, v, f) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="f">${f}</div></div>`;
+  box.innerHTML = `<h2>${esc(it.name)} <span class="desc">${esc(it.gu)} ${esc(it.dong)} ${esc(it.jibun)} · ${it.buildYear}년 준공 · ${it.hh.toLocaleString()}세대</span></h2>
+    <div class="desc">최근 실거래: ${t[0]} · ${area(t[1])} · ${t[3] ?? '-'}층 · <b>${eok(t[2])}</b></div>
+    <div class="stats">
+      ${stat('① 평균 대지지분', avg.toFixed(1) + '평', `대지 ${Math.round(it.plat).toLocaleString()}㎡ ÷ ${it.hh.toLocaleString()}세대`)}
+      ${stat('② 전용 1평당 대지지분', ratio ? ratio.toFixed(2) + '평' : '-', ratio ? `대지 ${Math.round(it.plat).toLocaleString()}㎡ ÷ 전용 합 ${Math.round(it.excl).toLocaleString()}㎡` : '전용면적 합 자료 없음')}
+      ${stat('③ 실거래가 ÷ 평균 대지지분', man(t[2] / avg) + '/평', `${eok(t[2])} ÷ ${avg.toFixed(1)}평`)}
+      ${stat('④ 실거래가 ÷ 전용면적', man(t[2] / tpy) + '/평', `${eok(t[2])} ÷ 전용 ${tpy.toFixed(1)}평`)}
+    </div>
+    <div class="scroll"><table><tr><th>최근 실거래</th><th class="num">가격</th><th class="num">③ ÷평균지분</th><th class="num">④ ÷전용평</th></tr>
+      ${it.recent.map(r => `<tr><td class="tr">${r[0].slice(2)} · ${area(r[1])} · ${r[3] ?? '-'}층</td>
+        <td class="num"><b>${eok(r[2])}</b></td><td class="num">${man(r[2] / avg)}</td><td class="num">${man(r[2] / (r[1] / PY))}</td></tr>`).join('')}</table></div>
+    <div class="note">대지면적·세대수: 건축물대장(총괄표제부, 없으면 동별 표제부 합). 전용면적 합: 건축물대장 전유부(아파트 호의 전용면적 합, 일부 단지만). 대지면적에 상가 몫이 들어 있을 수 있습니다. 실거래가: 국토교통부(해제 거래 제외).</div>`;
+}
 
 function renderPress() {
   const its = allItems().filter(it => it.press && visible(it));
@@ -308,6 +379,7 @@ function onMove() {
       const gu = (r.find(x => x.region_type === 'B') || r[0]).region_2depth_name;
       const g = index.find(x => x.gu === gu && x.count);
       if (g && g.code !== focusGu) { focusGu = g.code; document.getElementById('gu').value = g.code; await placeMarkers((await loadGu(g.code)).items); }
+      if (mode === 'now') { const c2 = index.find(x => x.gu === gu); if (c2) placeNow(c2.code); }
     }
     refresh();
   });
@@ -334,12 +406,13 @@ async function placeMarkers(items) {
     el.className = 'label';
     el.onclick = () => toggle(it.id);
     const o = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p[0], p[1]), content: el, yAnchor: 1.15, clickable: true });
-    o.setMap(map); o.el = el; o.it = it; overlays[it.id] = o;
+    o.setMap(mode === 'now' ? null : map); o.el = el; o.it = it; overlays[it.id] = o;
   }
   document.getElementById('mapmsg').textContent = miss ? `위치를 찾지 못한 단지 ${miss}곳은 지도에 없고 표에만 나옵니다.` : '';
 }
 
 function drawLabels() {
+  for (const o of Object.values(nowOverlays)) { o.el.classList.toggle('sel', o.it.id === nowId); o.setZIndex(o.it.id === nowId ? 30 : 10); }
   for (const o of Object.values(overlays)) {
     const ts = winTrades(o.it), sel = selected.includes(o.it.id);
     const avg = ts.length ? ts.reduce((s, t) => s + t[2], 0) / ts.length : 0;
