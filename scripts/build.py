@@ -110,26 +110,22 @@ LAND = os.path.join(ROOT, "land.json")
 
 
 def add_land(lawd, items):
-    """land.json(재건축 전 세대당 대지지분)을 단지에 붙인다."""
+    """재건축 전 세대당 대지지분 = 새 단지 대지면적(건축물대장) ÷ 재건축 전 세대수(land.json)."""
     if not os.path.exists(LAND):
         return
+    areas = json.load(open(os.path.join(ROOT, "data", "land_area.json"), encoding="utf-8"))         if os.path.exists(os.path.join(ROOT, "data", "land_area.json")) else {}
     for d in json.load(open(LAND, encoding="utf-8"))["items"]:
         if d["gu"] != lawd:
             continue
         it = next((x for x in items if x["name"] == d["name"]), None)
-        if it is None:
-            print(f"   [대지지분 단지 못 찾음] {d['name']}")
+        a = areas.get(it["id"]) if it else None
+        if not a:
+            print(f"   [대지지분 못 냄] {d['name']} (단지 또는 대지면적 없음)")
             continue
-        if d["kind"] == "area":
-            m2 = d["zone_m2"] / d["households"]
-            v = {"kind": "area", "py": round(m2 / 3.3058, 1), "m2": round(m2, 1),
-                 "text": f"구역면적 {d['zone_m2']:,.1f}㎡ ÷ 기존 {d['households']:,}세대"}
-        else:
-            v = {"kind": "article", "py": d["land_py"], "pyeong": d["pyeong"], "text": f"{d['pyeong']} 대지지분"}
-        v.update({"old": d["old"], "source": d["source"], "url": d["url"]})
-        it.setdefault("land", []).append(v)
-        print(f"   [대지지분] {it['name']} ← {d['old']} {v['py']}평 ({v['kind']})")
-
+        m2 = a["platArea"] / d["households"]
+        it["land"] = {"py": round(m2 / 3.3058, 1), "m2": round(m2, 1), "plat": a["platArea"], "hh": d["households"],
+                      "old": d["old"], "source": d["source"], "url": d["url"]}
+        print(f"   [대지지분] {it['name']} ← {d['old']}: {a['platArea']:,.1f}㎡ ÷ {d['households']:,}세대 = {it['land']['py']}평")
 
 
 def add_press(lawd, gu, cs, items):

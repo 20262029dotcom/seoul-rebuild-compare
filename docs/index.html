@@ -110,10 +110,9 @@ const addMonth = (m, k) => { let [y, mo] = m.split('-').map(Number); mo += k; wh
 const okSize = t => !size || band(t[1]) === size;
 const allItems = () => Object.values(loaded).flatMap(d => d.items);
 const winTrades = it => { const a = addMonth(month, -1); return it.trades.filter(t => okSize(t) && (t[0].startsWith(a) || t[0].startsWith(month))); };
-// 재건축 전 세대당 대지지분 표시 (구역면적 어림값은 '약'과 함께 표시)
-const landHtml = it => (it.land || []).map(l => l.kind === 'area'
-  ? `<div class="desc land">대지지분 약 ${l.py}평/세대 <span title="${esc(l.text)} · 도로·공원 포함이라 실제보다 큼">(구역면적 어림)</span> <a href="${esc(l.url)}" target="_blank" rel="noopener">출처</a></div>`
-  : `<div class="desc land">대지지분 ${esc(l.pyeong)} ${l.py}평 <span>(기사)</span> <a href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.source)}">출처</a></div>`).join('');
+// 재건축 전 세대당 대지지분 = 새 단지 대지면적(건축물대장) ÷ 재건축 전 세대수
+const landText = l => `대지지분 약 ${l.py}평/세대`;
+const landHtml = it => it.land ? `<div class="desc land">${landText(it.land)} <span title="새 단지 대지면적 ${it.land.plat.toLocaleString()}㎡ ÷ 재건축 전 ${it.land.hh.toLocaleString()}세대(${esc(it.land.source)})">(대지 ${Math.round(it.land.plat).toLocaleString()}㎡ ÷ ${it.land.hh.toLocaleString()}세대)</span> <a href="${esc(it.land.url)}" target="_blank" rel="noopener">세대수 출처</a></div>` : '';
 const colorOf = id => COLORS[selected.indexOf(id) % COLORS.length];
 
 async function init() {
@@ -239,7 +238,7 @@ function renderChart() {
     return `<div>· ${esc(it.name)}: ${why}${np ? ` — 신문 시세 ${np}건만 ▲로 표시` : ''}</div>`;
   }).join('');
   document.getElementById('chartnote').innerHTML += items.filter(it => it.land).map(it =>
-    `<div style="color:#166534">· ${esc(it.name)} 재건축 전 대지지분: ${it.land.map(l => l.kind === 'area' ? `약 ${l.py}평/세대(구역면적 어림)` : `${esc(l.pyeong)} ${l.py}평(기사)`).join(', ')}</div>`).join('');
+    `<div style="color:#166534">· ${esc(it.name)} 재건축 전 ${landText(it.land)}</div>`).join('');
   const toX = d => { const [y, m, dd] = d.split('-').map(Number); return y + (m - 1) / 12 + dd / 365; };
   const [y, m] = month.split('-').map(Number);
   // 전용면적을 소수점 첫째 자리까지 같으면 하나로 묶는다 (예: 106.25㎡와 106.26㎡ → 106.2㎡ 묶음)
@@ -346,7 +345,7 @@ function drawLabels() {
     const avg = ts.length ? ts.reduce((s, t) => s + t[2], 0) / ts.length : 0;
     o.el.className = 'label' + (ts.length ? '' : ' off') + (sel ? ' sel' : '');
     o.el.innerHTML = `${esc(o.it.name)}${ts.length ? `<br><span class="p">${eok(avg)}</span> <span class="desc">${ts.length > 1 ? ts.length + '건 평균' : '전용 ' + ts[0][1].toFixed(2) + '㎡'}</span>` : ''}`;
-    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ') + (o.it.press ? ' · 2006년 이전 신문 시세 있음' : '') + (o.it.note ? ' · ' + o.it.note : '') + (o.it.land ? ' · 대지지분 ' + o.it.land.map(l => (l.kind === 'area' ? '약 ' : l.pyeong + ' ') + l.py + '평').join(', ') : '');
+    o.el.title = '재건축 전: ' + o.it.old.map(x => x.name).join(', ') + (o.it.press ? ' · 2006년 이전 신문 시세 있음' : '') + (o.it.note ? ' · ' + o.it.note : '') + (o.it.land ? ' · ' + landText(o.it.land) : '');
     o.setZIndex(sel ? 30 : ts.length ? 20 : 1);
   }
 }
