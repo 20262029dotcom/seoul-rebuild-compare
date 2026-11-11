@@ -97,7 +97,7 @@ def main():
                     print(f"   [실패] {c['name']}: {e}", flush=True)
                     return c["id"], None
 
-            with ThreadPoolExecutor(4) as ex:
+            with ThreadPoolExecutor(2) as ex:   # 4개면 429(너무 빨리 부름)가 많이 남
                 for n, (cid, r) in enumerate(ex.map(job, todo), 1):
                     if r:
                         area[cid] = r
