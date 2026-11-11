@@ -37,7 +37,7 @@ def call(key, ep, sgg, bj, jibun):
             t = urllib.request.urlopen(API + ep + "?" + q, timeout=30).read().decode("utf-8", "replace")
             break
         except urllib.error.HTTPError as e:
-            if e.code not in (500, 502, 503) or n == 3:
+            if e.code not in (429, 500, 502, 503) or n == 3:   # 429: 너무 빨리 부름 → 잠시 쉬고 다시
                 raise
             time.sleep(5 * (n + 1))
     rows = []

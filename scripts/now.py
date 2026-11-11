@@ -78,6 +78,7 @@ def main():
     codes, area = load(CODES, {}), load(AREA, {})
     excl = load(EXCL, {})
     fetch = "--build" not in sys.argv
+    stop = []
     for lawd, gu in GU.items():
         cs = complexes(lawd)
         if fetch:
@@ -86,9 +87,13 @@ def main():
             todo = [c for c in cs if c["id"] not in area and codes.get(f"{lawd}-{c['dong']}")]
 
             def job(c):
+                if stop:   # 쉬었다 불러도 429 면 하루 한도를 다 쓴 것: 오늘은 그만
+                    return c["id"], None
                 try:
                     return c["id"], ledger(key, lawd, codes[f"{lawd}-{c['dong']}"], c)
                 except Exception as e:
+                    if "429" in str(e):
+                        stop.append(1)
                     print(f"   [실패] {c['name']}: {e}", flush=True)
                     return c["id"], None
 
